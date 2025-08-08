@@ -1,36 +1,1180 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Teste API - Passômetro</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passômetro Digital - UPA José Belchior</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#06b6d4',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            color: white;
+        }
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .pulse-warning {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .signature-pad {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+        .signature-pad.signed {
+            border-color: #10b981;
+            background-color: #f0fdf4;
+        }
+    </style>
 </head>
-<body>
-  <h1>Testar API do Google Apps Script</h1>
-  <button onclick="buscarPendencias()">Buscar Pendências</button>
-  <pre id="resultado"></pre>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-primary">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Passômetro Digital</h1>
+                    <p class="text-gray-600 mt-1">UPA José Belchior - Gestão de Plantão</p>
+                    <div class="flex items-center mt-2 text-sm">
+                        <span class="text-gray-500">Plantão atual:</span>
+                        <span class="ml-2 font-medium text-primary" id="currentShift">Diurno - 08/08/2025</span>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="openShiftChangeModal()" class="bg-warning text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2 pulse-warning">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Passagem de Plantão
+                    </button>
+                    <button onclick="exportReport()" class="bg-success text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Exportar Relatório
+                    </button>
+                    <button onclick="refreshData()" class="bg-accent text-white px-4 py-2 rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2" id="refreshBtn">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Atualizar
+                    </button>
+                    <button onclick="openNewPendencyModal()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nova Pendência
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
 
-  <script>
-    async function buscarPendencias() {
-      const consultorio = encodeURIComponent("Consultório 1 (Adulto)");
-      const url = "https://script.google.com/macros/s/SEU_ID_EXEC/exec?consultorio=" + consultorio;
+    <!-- Alertas -->
+    <div id="alertsContainer" class="container mx-auto px-4 pt-4">
+        <!-- Alertas serão inseridos aqui -->
+    </div>
 
-      try {
-        const resposta = await fetch(url, {
-          method: "GET",
-          mode: "cors"
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Resumo do Plantão -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <!-- Versão Desktop -->
+            <div class="hidden md:block p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Resumo do Plantão</h2>
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600" id="totalPendencias">0</div>
+                        <div class="text-sm text-gray-600">Pendências Ativas</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600" id="totalAceitas">0</div>
+                        <div class="text-sm text-gray-600">Aceitas Hoje</div>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-yellow-600" id="tempoMedio">--</div>
+                        <div class="text-sm text-gray-600">Tempo Médio</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-red-600" id="pendenciasUrgentes">0</div>
+                        <div class="text-sm text-gray-600">Urgentes (>4h)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Versão Mobile - Dropdown -->
+            <div class="md:hidden">
+                <button onclick="toggleSummaryDropdown()" class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors" id="summaryToggle">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-primary p-2 rounded-lg">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Resumo do Plantão</h2>
+                            <div class="text-sm text-gray-600">
+                                <span id="mobileSummaryText">5 ativas • 0 aceitas • 5 urgentes</span>
+                            </div>
+                        </div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 transform transition-transform" id="summaryChevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                
+                <div class="hidden border-t border-gray-200" id="summaryDropdown">
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <span class="text-sm font-medium text-gray-700">Pendências Ativas</span>
+                            </div>
+                            <span class="text-lg font-bold text-blue-600" id="totalPendenciasMobile">0</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span class="text-sm font-medium text-gray-700">Aceitas Hoje</span>
+                            </div>
+                            <span class="text-lg font-bold text-green-600" id="totalAceitasMobile">0</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                <span class="text-sm font-medium text-gray-700">Tempo Médio</span>
+                            </div>
+                            <span class="text-lg font-bold text-yellow-600" id="tempoMedioMobile">--</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span class="text-sm font-medium text-gray-700">Urgentes (>4h)</span>
+                            </div>
+                            <span class="text-lg font-bold text-red-600" id="pendenciasUrgentesMobile">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex flex-wrap border-b" id="consultorioTabs">
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors tab-active" data-tab="Consultório 1 (Adulto)">
+                    Consultório 1 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 2 (Adulto)">
+                    Consultório 2 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 3 (Adulto)">
+                    Consultório 3 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 4 (Adulto)">
+                    Consultório 4 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 1 (Pediatria)">
+                    Consultório 1 (Pediatria)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 2 (Pediatria)">
+                    Consultório 2 (Pediatria)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Sala Vermelha">
+                    Sala Vermelha
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="grid gap-6" id="pendenciasContainer">
+            <!-- Pendências serão carregadas aqui dinamicamente -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-600 mb-2">Nenhuma pendência encontrada</h3>
+            <p class="text-gray-500">Não há pendências ativas para este consultório no momento.</p>
+        </div>
+    </main>
+
+    <!-- Modal Nova Pendência -->
+    <div id="newPendencyModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Nova Pendência</h2>
+                    <button onclick="closeNewPendencyModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="newPendencyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Consultório de Destino *</label>
+                        <select id="consultorioDestino" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <option value="">Selecione o consultório</option>
+                            <option value="Consultório 1 (Adulto)">Consultório 1 (Adulto)</option>
+                            <option value="Consultório 2 (Adulto)">Consultório 2 (Adulto)</option>
+                            <option value="Consultório 3 (Adulto)">Consultório 3 (Adulto)</option>
+                            <option value="Consultório 4 (Adulto)">Consultório 4 (Adulto)</option>
+                            <option value="Consultório 1 (Pediatria)">Consultório 1 (Pediatria)</option>
+                            <option value="Consultório 2 (Pediatria)">Consultório 2 (Pediatria)</option>
+                            <option value="Sala Vermelha">Sala Vermelha</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Paciente *</label>
+                        <input type="text" id="nomePaciente" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite o nome do paciente">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Motivo da Pendência *</label>
+                        <input type="text" id="motivoPendencia" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Ex: Aguardando resultado de exame">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Resumo Clínico *</label>
+                        <textarea id="resumoClinico" required rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Descrição detalhada do caso"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
+                        <select id="prioridadePendencia" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <option value="normal">Normal</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seu Nome (Médico) *</label>
+                        <input type="text" id="medicoNome" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite seu nome">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeNewPendencyModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2" id="saveBtn">
+                            <span>Salvar Pendência</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Aceitar Pendência -->
+    <div id="acceptPendencyModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Aceitar Pendência</h2>
+                    <button onclick="closeAcceptPendencyModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="acceptPendencyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seu Nome (Médico que assume) *</label>
+                        <input type="text" id="medicoAceite" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite seu nome">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeAcceptPendencyModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-success text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2" id="acceptBtn">
+                            <span>Aceitar Demanda</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Passagem de Plantão -->
+    <div id="shiftChangeModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Passagem de Plantão</h2>
+                    <button onclick="closeShiftChangeModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Aviso Obrigatório -->
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">ATENÇÃO - OBRIGATÓRIO</h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <p><strong>É OBRIGATÓRIO exportar o relatório do plantão antes de finalizar a passagem.</strong></p>
+                                <p>O relatório deve ser entregue ao médico que assume o plantão e arquivado conforme protocolo da unidade.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status do Relatório -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-medium text-gray-800">Status do Relatório</h3>
+                            <p class="text-sm text-gray-600" id="reportStatus">Relatório não exportado</p>
+                        </div>
+                        <button onclick="exportReportForShift()" class="bg-success text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2" id="exportReportBtn">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Exportar Relatório Agora
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Formulário de Passagem -->
+                <form id="shiftChangeForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Médico que Sai *</label>
+                            <input type="text" id="medicoSai" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Seu nome completo">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CRM *</label>
+                            <input type="text" id="crmSai" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Seu CRM">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Médico que Entra *</label>
+                            <input type="text" id="medicoEntra" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome do médico que assume">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CRM *</label>
+                            <input type="text" id="crmEntra" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="CRM do médico que assume">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Observações Gerais do Plantão</label>
+                        <textarea id="observacoesPlantao" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Observações importantes sobre o plantão, intercorrências, etc."></textarea>
+                    </div>
+
+                    <!-- Termo de Ciência -->
+                    <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                        <h3 class="text-lg font-bold text-blue-800 mb-4">TERMO DE CIÊNCIA DE PASSAGEM DE PLANTÃO</h3>
+                        
+                        <div class="space-y-4 text-sm text-blue-900">
+                            <p><strong>Eu, médico(a) que SAI do plantão,</strong> declaro que:</p>
+                            <ul class="list-disc list-inside space-y-2 ml-4">
+                                <li>Repassei todas as informações relevantes sobre os pacientes sob minha responsabilidade;</li>
+                                <li>Exportei e entreguei o relatório completo do plantão;</li>
+                                <li>Informei sobre todas as pendências ativas e suas respectivas prioridades;</li>
+                                <li>Comuniquei intercorrências e situações especiais ocorridas durante o plantão;</li>
+                                <li>Certifico-me de que não há pendências críticas sem acompanhamento adequado.</li>
+                            </ul>
+
+                            <p class="mt-4"><strong>Eu, médico(a) que ENTRA no plantão,</strong> declaro que:</p>
+                            <ul class="list-disc list-inside space-y-2 ml-4">
+                                <li>Recebi todas as informações sobre os pacientes e pendências ativas;</li>
+                                <li>Recebi o relatório completo do plantão anterior;</li>
+                                <li>Estou ciente de todas as situações que requerem acompanhamento;</li>
+                                <li>Assumo a responsabilidade pelos pacientes e pendências informadas;</li>
+                                <li>Comprometo-me a dar continuidade adequada aos cuidados iniciados.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Assinaturas -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div>
+                                <label class="block text-sm font-medium text-blue-800 mb-2">Assinatura - Médico que Sai</label>
+                                <canvas id="signaturePadOut" class="signature-pad w-full h-24 bg-white" width="300" height="96"></canvas>
+                                <button type="button" onclick="clearSignature('signaturePadOut')" class="text-xs text-blue-600 hover:text-blue-800 mt-1">Limpar Assinatura</button>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-blue-800 mb-2">Assinatura - Médico que Entra</label>
+                                <canvas id="signaturePadIn" class="signature-pad w-full h-24 bg-white" width="300" height="96"></canvas>
+                                <button type="button" onclick="clearSignature('signaturePadIn')" class="text-xs text-blue-600 hover:text-blue-800 mt-1">Limpar Assinatura</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Confirmações Obrigatórias -->
+                    <div class="space-y-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="confirmReport" required class="rounded border-gray-300 text-primary focus:ring-primary">
+                            <span class="ml-2 text-sm text-gray-700">Confirmo que o relatório do plantão foi exportado e entregue</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="confirmHandover" required class="rounded border-gray-300 text-primary focus:ring-primary">
+                            <span class="ml-2 text-sm text-gray-700">Confirmo que todas as informações foram repassadas adequadamente</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="confirmSignatures" required class="rounded border-gray-300 text-primary focus:ring-primary">
+                            <span class="ml-2 text-sm text-gray-700">Confirmo que ambos os médicos assinaram o termo de ciência</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-6">
+                        <button type="button" onclick="closeShiftChangeModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-warning text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2" id="finalizeShiftBtn" disabled>
+                            <span>Finalizar Passagem de Plantão</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dados mock para demonstração (substituindo o backend)
+        let pendenciasData = {
+            'Consultório 1 (Adulto)': [
+                {
+                    id: 1,
+                    nomePaciente: 'João Silva Santos',
+                    motivoPendencia: 'Aguardando resultado de tomografia',
+                    resumoClinico: 'Paciente de 45 anos com dor abdominal intensa há 6 horas. Suspeita de apendicite aguda. Solicitada tomografia para confirmação diagnóstica.',
+                    medicoSaida: 'Dr. Carlos Mendes',
+                    dataSaida: '08/08/2025 10:30',
+                    prioridade: 'alta',
+                    status: 'ativo'
+                },
+                {
+                    id: 2,
+                    nomePaciente: 'Maria Oliveira Costa',
+                    motivoPendencia: 'Aguardando vaga na UTI',
+                    resumoClinico: 'Paciente de 67 anos com insuficiência respiratória aguda. Necessita de suporte ventilatório. Aguardando liberação de leito na UTI.',
+                    medicoSaida: 'Dra. Ana Paula',
+                    dataSaida: '08/08/2025 09:15',
+                    prioridade: 'urgente',
+                    status: 'ativo'
+                }
+            ],
+            'Consultório 2 (Adulto)': [
+                {
+                    id: 3,
+                    nomePaciente: 'Pedro Almeida',
+                    motivoPendencia: 'Aguardando avaliação cardiológica',
+                    resumoClinico: 'Paciente de 58 anos com dor precordial e alterações no ECG. Necessita avaliação especializada urgente.',
+                    medicoSaida: 'Dr. Roberto Lima',
+                    dataSaida: '08/08/2025 11:45',
+                    prioridade: 'alta',
+                    status: 'ativo'
+                }
+            ],
+            'Consultório 3 (Adulto)': [],
+            'Consultório 4 (Adulto)': [],
+            'Consultório 1 (Pediatria)': [
+                {
+                    id: 4,
+                    nomePaciente: 'Lucas Ferreira (8 anos)',
+                    motivoPendencia: 'Aguardando resultado de hemograma',
+                    resumoClinico: 'Criança de 8 anos com febre alta há 3 dias e petéquias. Suspeita de dengue. Aguardando resultado de exames laboratoriais.',
+                    medicoSaida: 'Dra. Fernanda Pires',
+                    dataSaida: '08/08/2025 08:20',
+                    prioridade: 'normal',
+                    status: 'ativo'
+                }
+            ],
+            'Consultório 2 (Pediatria)': [],
+            'Sala Vermelha': [
+                {
+                    id: 5,
+                    nomePaciente: 'José Carlos Ribeiro',
+                    motivoPendencia: 'Aguardando cirurgia de emergência',
+                    resumoClinico: 'Paciente de 34 anos vítima de acidente de trânsito. Trauma abdominal fechado com sinais de hemorragia interna. Necessita cirurgia imediata.',
+                    medicoSaida: 'Dr. Eduardo Santos',
+                    dataSaida: '08/08/2025 12:10',
+                    prioridade: 'urgente',
+                    status: 'ativo'
+                }
+            ]
+        };
+
+        let historicoData = [];
+        let currentTab = 'Consultório 1 (Adulto)';
+        let currentPendencyId = null;
+        let reportExported = false;
+        let signaturePads = {};
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTabs();
+            loadPendencias();
+            setupFormHandlers();
+            updateSummary();
+            checkUrgentPendencies();
+            initializeSignaturePads();
         });
 
-        if (!resposta.ok) {
-          throw new Error(`Erro HTTP ${resposta.status}`);
+        // Inicializar pads de assinatura
+        function initializeSignaturePads() {
+            const canvases = ['signaturePadOut', 'signaturePadIn'];
+            canvases.forEach(canvasId => {
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    let isDrawing = false;
+                    
+                    signaturePads[canvasId] = {
+                        canvas: canvas,
+                        ctx: ctx,
+                        isEmpty: true
+                    };
+
+                    canvas.addEventListener('mousedown', startDrawing);
+                    canvas.addEventListener('mousemove', draw);
+                    canvas.addEventListener('mouseup', stopDrawing);
+                    canvas.addEventListener('touchstart', handleTouch);
+                    canvas.addEventListener('touchmove', handleTouch);
+                    canvas.addEventListener('touchend', stopDrawing);
+
+                    function startDrawing(e) {
+                        isDrawing = true;
+                        signaturePads[canvasId].isEmpty = false;
+                        canvas.classList.add('signed');
+                        const rect = canvas.getBoundingClientRect();
+                        ctx.beginPath();
+                        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+                    }
+
+                    function draw(e) {
+                        if (!isDrawing) return;
+                        const rect = canvas.getBoundingClientRect();
+                        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                        ctx.stroke();
+                    }
+
+                    function stopDrawing() {
+                        isDrawing = false;
+                        checkSignatures();
+                    }
+
+                    function handleTouch(e) {
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                                        e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY
+                        });
+                        canvas.dispatchEvent(mouseEvent);
+                    }
+                }
+            });
         }
 
-        const dados = await resposta.json();
-        document.getElementById("resultado").textContent = JSON.stringify(dados, null, 2);
-      } catch (erro) {
-        document.getElementById("resultado").textContent = "Erro: " + erro.message;
-        console.error("Erro ao buscar pendências:", erro);
-      }
-    }
-  </script>
+        // Limpar assinatura
+        function clearSignature(canvasId) {
+            const pad = signaturePads[canvasId];
+            if (pad) {
+                pad.ctx.clearRect(0, 0, pad.canvas.width, pad.canvas.height);
+                pad.isEmpty = true;
+                pad.canvas.classList.remove('signed');
+                checkSignatures();
+            }
+        }
+
+        // Verificar assinaturas
+        function checkSignatures() {
+            const bothSigned = !signaturePads['signaturePadOut']?.isEmpty && !signaturePads['signaturePadIn']?.isEmpty;
+            document.getElementById('confirmSignatures').checked = bothSigned;
+            updateFinalizeButton();
+        }
+
+        // Configurar tabs
+        function initializeTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+        }
+
+        // Trocar tab ativa
+        function switchTab(tabId) {
+            currentTab = tabId;
+            
+            // Atualizar aparência dos botões
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-gray-600', 'hover:text-primary');
+            });
+            
+            const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+            activeButton.classList.add('tab-active');
+            activeButton.classList.remove('text-gray-600', 'hover:text-primary');
+            
+            // Carregar pendências da tab ativa
+            loadPendencias();
+        }
+
+        // Carregar pendências
+        function loadPendencias() {
+            const container = document.getElementById('pendenciasContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            const pendenciasTab = pendenciasData[currentTab] || [];
+            
+            if (pendenciasTab.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = pendenciasTab.map(pendencia => {
+                const prioridadeClass = {
+                    'normal': 'bg-blue-100 text-blue-800',
+                    'alta': 'bg-yellow-100 text-yellow-800',
+                    'urgente': 'bg-red-100 text-red-800'
+                };
+
+                const tempoDecorrido = calcularTempoDecorrido(pendencia.dataSaida);
+                const isUrgent = tempoDecorrido > 4;
+
+                return `
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover fade-in ${isUrgent ? 'border-l-4 border-red-500' : ''}">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="text-lg font-semibold text-gray-800">${pendencia.nomePaciente}</h3>
+                                <span class="px-2 py-1 text-xs font-medium rounded-full ${prioridadeClass[pendencia.prioridade] || prioridadeClass.normal}">
+                                    ${pendencia.prioridade.toUpperCase()}
+                                </span>
+                                ${isUrgent ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">URGENTE (>4h)</span>' : ''}
+                            </div>
+                            <div class="flex items-center text-sm text-gray-600 mb-2">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ${pendencia.dataSaida} - ${pendencia.medicoSaida} (${tempoDecorrido}h)
+                            </div>
+                        </div>
+                        <button onclick="acceptPendency(${pendencia.id})" class="bg-success text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Aceitar Demanda
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-700">Motivo:</span>
+                            <p class="text-gray-600 mt-1">${pendencia.motivoPendencia}</p>
+                        </div>
+                        
+                        <div>
+                            <span class="text-sm font-medium text-gray-700">Resumo Clínico:</span>
+                            <p class="text-gray-600 mt-1">${pendencia.resumoClinico}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        // Calcular tempo decorrido
+        function calcularTempoDecorrido(dataSaida) {
+            const agora = new Date();
+            const [data, hora] = dataSaida.split(' ');
+            const [dia, mes, ano] = data.split('/');
+            const [horas, minutos] = hora.split(':');
+            const dataPendencia = new Date(ano, mes - 1, dia, horas, minutos);
+            const diffMs = agora - dataPendencia;
+            return Math.floor(diffMs / (1000 * 60 * 60));
+        }
+
+        // Controlar dropdown do resumo (mobile)
+        function toggleSummaryDropdown() {
+            const dropdown = document.getElementById('summaryDropdown');
+            const chevron = document.getElementById('summaryChevron');
+            
+            if (dropdown.classList.contains('hidden')) {
+                dropdown.classList.remove('hidden');
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                dropdown.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Atualizar resumo
+        function updateSummary() {
+            let totalPendencias = 0;
+            let totalUrgentes = 0;
+            let tempoTotal = 0;
+
+            Object.values(pendenciasData).forEach(consultorio => {
+                consultorio.forEach(pendencia => {
+                    totalPendencias++;
+                    const tempo = calcularTempoDecorrido(pendencia.dataSaida);
+                    tempoTotal += tempo;
+                    if (tempo > 4) totalUrgentes++;
+                });
+            });
+
+            const tempoMedio = totalPendencias > 0 ? Math.round(tempoTotal / totalPendencias) + 'h' : '--';
+
+            // Atualizar versão desktop
+            document.getElementById('totalPendencias').textContent = totalPendencias;
+            document.getElementById('totalAceitas').textContent = historicoData.length;
+            document.getElementById('tempoMedio').textContent = tempoMedio;
+            document.getElementById('pendenciasUrgentes').textContent = totalUrgentes;
+
+            // Atualizar versão mobile
+            document.getElementById('totalPendenciasMobile').textContent = totalPendencias;
+            document.getElementById('totalAceitasMobile').textContent = historicoData.length;
+            document.getElementById('tempoMedioMobile').textContent = tempoMedio;
+            document.getElementById('pendenciasUrgentesMobile').textContent = totalUrgentes;
+
+            // Atualizar texto resumido mobile
+            document.getElementById('mobileSummaryText').textContent = 
+                `${totalPendencias} ativas • ${historicoData.length} aceitas • ${totalUrgentes} urgentes`;
+        }
+
+        // Verificar pendências urgentes
+        function checkUrgentPendencies() {
+            let hasUrgent = false;
+            Object.values(pendenciasData).forEach(consultorio => {
+                consultorio.forEach(pendencia => {
+                    if (calcularTempoDecorrido(pendencia.dataSaida) > 4) {
+                        hasUrgent = true;
+                    }
+                });
+            });
+
+            if (hasUrgent) {
+                showAlert('Existem pendências com mais de 4 horas aguardando resolução!', 'warning');
+            }
+        }
+
+        // Mostrar alerta
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.getElementById('alertsContainer');
+            const colors = {
+                success: 'bg-green-50 border-green-200 text-green-800',
+                error: 'bg-red-50 border-red-200 text-red-800',
+                warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+                info: 'bg-blue-50 border-blue-200 text-blue-800'
+            };
+
+            const alert = document.createElement('div');
+            alert.className = `${colors[type]} border-l-4 p-4 mb-4 rounded`;
+            alert.innerHTML = `
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm">${message}</p>
+                    </div>
+                    <div class="ml-auto pl-3">
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            alertsContainer.appendChild(alert);
+        }
+
+        // Configurar handlers dos formulários
+        function setupFormHandlers() {
+            document.getElementById('newPendencyForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                savePendency();
+            });
+            
+            document.getElementById('acceptPendencyForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                confirmAcceptPendency();
+            });
+
+            document.getElementById('shiftChangeForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                finalizeShiftChange();
+            });
+
+            // Monitorar checkboxes para habilitar botão
+            ['confirmReport', 'confirmHandover', 'confirmSignatures'].forEach(id => {
+                document.getElementById(id).addEventListener('change', updateFinalizeButton);
+            });
+        }
+
+        // Atualizar botão de finalizar
+        function updateFinalizeButton() {
+            const allChecked = ['confirmReport', 'confirmHandover', 'confirmSignatures'].every(id => 
+                document.getElementById(id).checked
+            );
+            document.getElementById('finalizeShiftBtn').disabled = !allChecked || !reportExported;
+        }
+
+        // Abrir modal nova pendência
+        function openNewPendencyModal() {
+            document.getElementById('newPendencyModal').classList.remove('hidden');
+            document.getElementById('consultorioDestino').value = currentTab;
+        }
+
+        // Fechar modal nova pendência
+        function closeNewPendencyModal() {
+            document.getElementById('newPendencyModal').classList.add('hidden');
+            document.getElementById('newPendencyForm').reset();
+        }
+
+        // Salvar nova pendência
+        function savePendency() {
+            const consultorio = document.getElementById('consultorioDestino').value;
+            const nomePaciente = document.getElementById('nomePaciente').value;
+            const motivoPendencia = document.getElementById('motivoPendencia').value;
+            const resumoClinico = document.getElementById('resumoClinico').value;
+            const prioridade = document.getElementById('prioridadePendencia').value;
+            const medicoNome = document.getElementById('medicoNome').value;
+
+            const novaPendencia = {
+                id: Date.now(),
+                nomePaciente: nomePaciente,
+                motivoPendencia: motivoPendencia,
+                resumoClinico: resumoClinico,
+                prioridade: prioridade,
+                medicoSaida: medicoNome,
+                dataSaida: new Date().toLocaleString('pt-BR'),
+                status: 'ativo'
+            };
+
+            if (!pendenciasData[consultorio]) {
+                pendenciasData[consultorio] = [];
+            }
+            pendenciasData[consultorio].push(novaPendencia);
+
+            closeNewPendencyModal();
+            
+            if (currentTab === consultorio) {
+                loadPendencias();
+            }
+            
+            updateSummary();
+            showNotification('Pendência criada com sucesso!', 'success');
+        }
+
+        // Aceitar pendência
+        function acceptPendency(pendencyId) {
+            currentPendencyId = pendencyId;
+            document.getElementById('acceptPendencyModal').classList.remove('hidden');
+        }
+
+        // Fechar modal aceitar pendência
+        function closeAcceptPendencyModal() {
+            document.getElementById('acceptPendencyModal').classList.add('hidden');
+            document.getElementById('acceptPendencyForm').reset();
+            currentPendencyId = null;
+        }
+
+        // Confirmar aceite da pendência
+        function confirmAcceptPendency() {
+            const medicoAceite = document.getElementById('medicoAceite').value;
+            if (!medicoAceite) {
+                showNotification('Por favor, digite seu nome.', 'warning');
+                return;
+            }
+
+            const pendenciasTab = pendenciasData[currentTab];
+            const pendenciaIndex = pendenciasTab.findIndex(p => p.id === currentPendencyId);
+            
+            if (pendenciaIndex !== -1) {
+                const pendencia = pendenciasTab[pendenciaIndex];
+                
+                const pendenciaHistorico = {
+                    ...pendencia,
+                    medicoAceite: medicoAceite,
+                    dataAceite: new Date().toLocaleString('pt-BR'),
+                    consultorioOrigem: currentTab,
+                    status: 'aceita'
+                };
+                historicoData.push(pendenciaHistorico);
+                
+                pendenciasTab.splice(pendenciaIndex, 1);
+                
+                closeAcceptPendencyModal();
+                loadPendencias();
+                updateSummary();
+                showNotification('Pendência aceita com sucesso!', 'success');
+            }
+        }
+
+        // Atualizar dados
+        function refreshData() {
+            loadPendencias();
+            updateSummary();
+            showNotification('Dados atualizados!', 'info');
+        }
+
+        // Abrir modal passagem de plantão
+        function openShiftChangeModal() {
+            document.getElementById('shiftChangeModal').classList.remove('hidden');
+            updateReportStatus();
+        }
+
+        // Fechar modal passagem de plantão
+        function closeShiftChangeModal() {
+            document.getElementById('shiftChangeModal').classList.add('hidden');
+            document.getElementById('shiftChangeForm').reset();
+            // Limpar assinaturas
+            clearSignature('signaturePadOut');
+            clearSignature('signaturePadIn');
+        }
+
+        // Atualizar status do relatório
+        function updateReportStatus() {
+            const statusElement = document.getElementById('reportStatus');
+            const btnElement = document.getElementById('exportReportBtn');
+            
+            if (reportExported) {
+                statusElement.textContent = 'Relatório exportado com sucesso';
+                statusElement.className = 'text-sm text-green-600';
+                btnElement.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Relatório Exportado
+                `;
+                btnElement.className = 'bg-green-600 text-white px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-2';
+                btnElement.disabled = true;
+                document.getElementById('confirmReport').checked = true;
+            } else {
+                statusElement.textContent = 'Relatório não exportado';
+                statusElement.className = 'text-sm text-red-600';
+            }
+            updateFinalizeButton();
+        }
+
+        // Exportar relatório para passagem
+        function exportReportForShift() {
+            exportReport();
+            reportExported = true;
+            updateReportStatus();
+        }
+
+        // Exportar relatório
+        function exportReport() {
+            const now = new Date();
+            const dataRelatorio = now.toLocaleDateString('pt-BR');
+            const horaRelatorio = now.toLocaleTimeString('pt-BR');
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "RELATÓRIO DO PLANTÃO - UPA JOSÉ BELCHIOR\n";
+            csvContent += `Data/Hora do Relatório: ${dataRelatorio} ${horaRelatorio}\n\n`;
+            
+            // Cabeçalho
+            csvContent += "Consultório,Nome do Paciente,Motivo da Pendência,Resumo Clínico,Médico que Deixou,Data/Hora Saída,Prioridade,Tempo Decorrido,Status\n";
+            
+            // Pendências ativas
+            csvContent += "\n=== PENDÊNCIAS ATIVAS ===\n";
+            let totalPendenciasAtivas = 0;
+            let totalUrgentes = 0;
+            
+            Object.keys(pendenciasData).forEach(consultorio => {
+                const pendencias = pendenciasData[consultorio];
+                pendencias.forEach(pendencia => {
+                    totalPendenciasAtivas++;
+                    const tempo = calcularTempoDecorrido(pendencia.dataSaida);
+                    if (tempo > 4) totalUrgentes++;
+                    csvContent += `"${consultorio}","${pendencia.nomePaciente}","${pendencia.motivoPendencia}","${pendencia.resumoClinico}","${pendencia.medicoSaida}","${pendencia.dataSaida}","${pendencia.prioridade}","${tempo}h","Ativa"\n`;
+                });
+            });
+            
+            // Histórico
+            csvContent += "\n=== HISTÓRICO (PENDÊNCIAS ACEITAS) ===\n";
+            csvContent += "Consultório,Nome do Paciente,Motivo da Pendência,Resumo Clínico,Médico que Deixou,Data/Hora Saída,Médico que Assumiu,Data/Hora Aceite,Prioridade,Status\n";
+            
+            historicoData.forEach(pendencia => {
+                csvContent += `"${pendencia.consultorioOrigem}","${pendencia.nomePaciente}","${pendencia.motivoPendencia}","${pendencia.resumoClinico}","${pendencia.medicoSaida}","${pendencia.dataSaida}","${pendencia.medicoAceite}","${pendencia.dataAceite}","${pendencia.prioridade}","Aceita"\n`;
+            });
+            
+            // Resumo
+            csvContent += "\n=== RESUMO DO PLANTÃO ===\n";
+            csvContent += `Total de Pendências Ativas: ${totalPendenciasAtivas}\n`;
+            csvContent += `Pendências Urgentes (>4h): ${totalUrgentes}\n`;
+            csvContent += `Total de Pendências Aceitas: ${historicoData.length}\n`;
+            csvContent += `Total Geral: ${totalPendenciasAtivas + historicoData.length}\n`;
+            
+            // Observações importantes
+            if (totalUrgentes > 0) {
+                csvContent += "\n=== ATENÇÃO ===\n";
+                csvContent += `EXISTEM ${totalUrgentes} PENDÊNCIAS COM MAIS DE 4 HORAS AGUARDANDO RESOLUÇÃO!\n`;
+            }
+            
+            // Criar e baixar o arquivo
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `relatorio_plantao_${dataRelatorio.replace(/\//g, '-')}_${horaRelatorio.replace(/:/g, '-')}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('Relatório exportado com sucesso!', 'success');
+        }
+
+        // Finalizar passagem de plantão
+        function finalizeShiftChange() {
+            const medicoSai = document.getElementById('medicoSai').value;
+            const crmSai = document.getElementById('crmSai').value;
+            const medicoEntra = document.getElementById('medicoEntra').value;
+            const crmEntra = document.getElementById('crmEntra').value;
+            const observacoes = document.getElementById('observacoesPlantao').value;
+
+            // Gerar termo de passagem
+            const now = new Date();
+            const dataHora = now.toLocaleString('pt-BR');
+            
+            let termoContent = "data:text/plain;charset=utf-8,";
+            termoContent += "TERMO DE CIÊNCIA DE PASSAGEM DE PLANTÃO\n";
+            termoContent += "UPA JOSÉ BELCHIOR\n\n";
+            termoContent += `Data/Hora: ${dataHora}\n\n`;
+            
+            termoContent += "MÉDICO QUE SAI DO PLANTÃO:\n";
+            termoContent += `Nome: ${medicoSai}\n`;
+            termoContent += `CRM: ${crmSai}\n\n`;
+            
+            termoContent += "MÉDICO QUE ENTRA NO PLANTÃO:\n";
+            termoContent += `Nome: ${medicoEntra}\n`;
+            termoContent += `CRM: ${crmEntra}\n\n`;
+            
+            if (observacoes) {
+                termoContent += "OBSERVAÇÕES DO PLANTÃO:\n";
+                termoContent += `${observacoes}\n\n`;
+            }
+            
+            termoContent += "DECLARAÇÕES:\n\n";
+            termoContent += "O médico que SAI declara que:\n";
+            termoContent += "- Repassou todas as informações relevantes sobre os pacientes\n";
+            termoContent += "- Exportou e entregou o relatório completo do plantão\n";
+            termoContent += "- Informou sobre todas as pendências ativas e prioridades\n";
+            termoContent += "- Comunicou intercorrências e situações especiais\n";
+            termoContent += "- Certificou-se de que não há pendências críticas sem acompanhamento\n\n";
+            
+            termoContent += "O médico que ENTRA declara que:\n";
+            termoContent += "- Recebeu todas as informações sobre pacientes e pendências\n";
+            termoContent += "- Recebeu o relatório completo do plantão anterior\n";
+            termoContent += "- Está ciente de todas as situações que requerem acompanhamento\n";
+            termoContent += "- Assume responsabilidade pelos pacientes e pendências informadas\n";
+            termoContent += "- Compromete-se a dar continuidade adequada aos cuidados\n\n";
+            
+            termoContent += "Este documento foi assinado digitalmente por ambas as partes.\n";
+            
+            // Baixar termo
+            const encodedUri = encodeURI(termoContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `termo_passagem_plantao_${now.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${now.toLocaleTimeString('pt-BR').replace(/:/g, '-')}.txt`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            closeShiftChangeModal();
+            showNotification('Passagem de plantão finalizada com sucesso! Termo gerado.', 'success');
+            
+            // Resetar status do relatório para o próximo plantão
+            reportExported = false;
+        }
+
+        // Mostrar notificação
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    </script>
 </body>
 </html>
