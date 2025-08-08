@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passômetro Digital - UPA José Belchior</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#06b6d4',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            color: white;
+        }
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-primary">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Passômetro Digital</h1>
+                    <p class="text-gray-600 mt-1">UPA José Belchior - Gestão de Plantão</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="refreshData()" class="bg-accent text-white px-4 py-2 rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2" id="refreshBtn">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Atualizar
+                    </button>
+                    <button onclick="openNewPendencyModal()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nova Pendência
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex flex-wrap border-b" id="consultorioTabs">
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors tab-active" data-tab="Consultório 1 (Adulto)">
+                    Consultório 1 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 2 (Adulto)">
+                    Consultório 2 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 3 (Adulto)">
+                    Consultório 3 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 4 (Adulto)">
+                    Consultório 4 (Adulto)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 1 (Pediatria)">
+                    Consultório 1 (Pediatria)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Consultório 2 (Pediatria)">
+                    Consultório 2 (Pediatria)
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-sm rounded-t-lg transition-colors text-gray-600 hover:text-primary" data-tab="Sala Vermelha">
+                    Sala Vermelha
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="grid gap-6" id="pendenciasContainer">
+            <!-- Pendências serão carregadas aqui dinamicamente -->
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12 hidden">
+            <div class="loading mx-auto mb-4"></div>
+            <p class="text-gray-600">Carregando pendências...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-600 mb-2">Nenhuma pendência encontrada</h3>
+            <p class="text-gray-500">Não há pendências ativas para este consultório no momento.</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="text-center py-12 hidden">
+            <svg class="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-red-600 mb-2">Erro ao carregar dados</h3>
+            <p class="text-gray-500 mb-4">Não foi possível conectar com o servidor. Tente novamente.</p>
+            <button onclick="refreshData()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
+                Tentar Novamente
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal Nova Pendência -->
+    <div id="newPendencyModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Nova Pendência</h2>
+                    <button onclick="closeNewPendencyModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="newPendencyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Consultório de Destino *</label>
+                        <select id="consultorioDestino" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <option value="">Selecione o consultório</option>
+                            <option value="Consultório 1 (Adulto)">Consultório 1 (Adulto)</option>
+                            <option value="Consultório 2 (Adulto)">Consultório 2 (Adulto)</option>
+                            <option value="Consultório 3 (Adulto)">Consultório 3 (Adulto)</option>
+                            <option value="Consultório 4 (Adulto)">Consultório 4 (Adulto)</option>
+                            <option value="Consultório 1 (Pediatria)">Consultório 1 (Pediatria)</option>
+                            <option value="Consultório 2 (Pediatria)">Consultório 2 (Pediatria)</option>
+                            <option value="Sala Vermelha">Sala Vermelha</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Paciente *</label>
+                        <input type="text" id="nomePaciente" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite o nome do paciente">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Motivo da Pendência *</label>
+                        <input type="text" id="motivoPendencia" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Ex: Aguardando resultado de exame">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Resumo Clínico *</label>
+                        <textarea id="resumoClinico" required rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Descrição detalhada do caso"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seu Nome (Médico) *</label>
+                        <input type="text" id="medicoNome" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite seu nome">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeNewPendencyModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2" id="saveBtn">
+                            <span>Salvar Pendência</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Aceitar Pendência -->
+    <div id="acceptPendencyModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Aceitar Pendência</h2>
+                    <button onclick="closeAcceptPendencyModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="acceptPendencyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seu Nome (Médico que assume) *</label>
+                        <input type="text" id="medicoAceite" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Digite seu nome">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeAcceptPendencyModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-success text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2" id="acceptBtn">
+                            <span>Aceitar Demanda</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // IMPORTANTE: Substitua pela URL da sua implantação do Google Apps Script
+        const GOOGLE_APPS_SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbz-kGcNEMSXKps3JCiZAt0F4MY6vmxl4GAcxrLClKqo101D68iZhmlz-U1TEDFzH7g/exec';
+
+        // Estado da aplicação
+        let currentTab = 'Consultório 1 (Adulto)';
+        let currentPendencyName = null;
+        let currentPendencyConsultorio = null;
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTabs();
+            loadPendencias();
+            setupFormHandlers();
+        });
+
+        // Configurar tabs
+        function initializeTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+        }
+
+        // Trocar tab ativa
+        function switchTab(tabId) {
+            currentTab = tabId;
+            
+            // Atualizar aparência dos botões
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-gray-600', 'hover:text-primary');
+            });
+            
+            const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+            activeButton.classList.add('tab-active');
+            activeButton.classList.remove('text-gray-600', 'hover:text-primary');
+            
+            // Carregar pendências da tab ativa
+            loadPendencias();
+        }
+
+        // Carregar pendências
+        async function loadPendencias() {
+            const container = document.getElementById('pendenciasContainer');
+            const emptyState = document.getElementById('emptyState');
+            const errorState = document.getElementById('errorState');
+            const loadingState = document.getElementById('loadingState');
+            
+            // Mostrar loading
+            container.innerHTML = '';
+            emptyState.classList.add('hidden');
+            errorState.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${GOOGLE_APPS_SCRIPT_API_URL}?consultorio=${encodeURIComponent(currentTab)}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Erro HTTP: ${response.status} - ${errorText}`);
+                }
+                
+                const pendenciasTab = await response.json();
+                
+                // Esconder loading
+                loadingState.classList.add('hidden');
+                
+                if (pendenciasTab.error) {
+                    throw new Error(pendenciasTab.error);
+                }
+
+                if (pendenciasTab.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                container.innerHTML = pendenciasTab.map(pendencia => `
+                    <div class="bg-white rounded-lg shadow-md p-6 card-hover fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">${pendencia['Nome do Paciente'] || 'N/A'}</h3>
+                                <div class="flex items-center text-sm text-gray-600 mb-2">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    ${pendencia['Data/Hora Saída'] || 'N/A'} - ${pendencia['Médico que Deixou'] || 'N/A'}
+                                </div>
+                            </div>
+                            <button onclick="acceptPendency('${pendencia['Nome do Paciente']}', '${currentTab}')" class="bg-success text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Aceitar Demanda
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <span class="text-sm font-medium text-gray-700">Motivo:</span>
+                                <p class="text-gray-600 mt-1">${pendencia['Motivo da Pendência'] || 'N/A'}</p>
+                            </div>
+                            
+                            <div>
+                                <span class="text-sm font-medium text-gray-700">Resumo Clínico:</span>
+                                <p class="text-gray-600 mt-1">${pendencia['Resumo Clínico'] || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Erro ao carregar pendências:', error);
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+                showNotification(`Erro: ${error.message}`, 'error');
+            }
+        }
+
+        // Configurar handlers dos formulários
+        function setupFormHandlers() {
+            document.getElementById('newPendencyForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                savePendency();
+            });
+            
+            document.getElementById('acceptPendencyForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                confirmAcceptPendency();
+            });
+        }
+
+        // Abrir modal nova pendência
+        function openNewPendencyModal() {
+            document.getElementById('newPendencyModal').classList.remove('hidden');
+            document.getElementById('consultorioDestino').value = currentTab;
+        }
+
+        // Fechar modal nova pendência
+        function closeNewPendencyModal() {
+            document.getElementById('newPendencyModal').classList.add('hidden');
+            document.getElementById('newPendencyForm').reset();
+        }
+
+        // Salvar nova pendência
+        async function savePendency() {
+            const saveBtn = document.getElementById('saveBtn');
+            const originalContent = saveBtn.innerHTML;
+            
+            // Mostrar loading no botão
+            saveBtn.innerHTML = '<div class="loading"></div>';
+            saveBtn.disabled = true;
+
+            const novaPendencia = {
+                action: 'create',
+                consultorio: document.getElementById('consultorioDestino').value,
+                nomePaciente: document.getElementById('nomePaciente').value,
+                motivoPendencia: document.getElementById('motivoPendencia').value,
+                resumoClinico: document.getElementById('resumoClinico').value,
+                medicoSaida: document.getElementById('medicoNome').value
+            };
+
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(novaPendencia)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeNewPendencyModal();
+                    // Se estamos na tab do consultório de destino, recarregar
+                    if (currentTab === novaPendencia.consultorio) {
+                        loadPendencias();
+                    }
+                    showNotification('Pendência criada com sucesso!', 'success');
+                } else {
+                    throw new Error(result.error || 'Erro desconhecido ao criar pendência.');
+                }
+
+            } catch (error) {
+                console.error('Erro ao salvar pendência:', error);
+                showNotification(`Erro: ${error.message}`, 'error');
+            } finally {
+                // Restaurar botão
+                saveBtn.innerHTML = originalContent;
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Aceitar pendência
+        function acceptPendency(pendencyName, consultorio) {
+            currentPendencyName = pendencyName;
+            currentPendencyConsultorio = consultorio;
+            document.getElementById('acceptPendencyModal').classList.remove('hidden');
+        }
+
+        // Fechar modal aceitar pendência
+        function closeAcceptPendencyModal() {
+            document.getElementById('acceptPendencyModal').classList.add('hidden');
+            document.getElementById('acceptPendencyForm').reset();
+            currentPendencyName = null;
+            currentPendencyConsultorio = null;
+        }
+
+        // Confirmar aceite da pendência
+        async function confirmAcceptPendency() {
+            const acceptBtn = document.getElementById('acceptBtn');
+            const originalContent = acceptBtn.innerHTML;
+            
+            // Mostrar loading no botão
+            acceptBtn.innerHTML = '<div class="loading"></div>';
+            acceptBtn.disabled = true;
+
+            const medicoAceite = document.getElementById('medicoAceite').value;
+            if (!medicoAceite) {
+                showNotification('Por favor, digite seu nome.', 'warning');
+                acceptBtn.innerHTML = originalContent;
+                acceptBtn.disabled = false;
+                return;
+            }
+
+            const acceptData = {
+                action: 'accept',
+                consultorio: currentPendencyConsultorio,
+                pendenciaId: currentPendencyName,
+                medicoAceite: medicoAceite
+            };
+
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(acceptData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeAcceptPendencyModal();
+                    loadPendencias();
+                    showNotification('Pendência aceita com sucesso!', 'success');
+                } else {
+                    throw new Error(result.error || 'Erro desconhecido ao aceitar pendência.');
+                }
+
+            } catch (error) {
+                console.error('Erro ao aceitar pendência:', error);
+                showNotification(`Erro: ${error.message}`, 'error');
+            } finally {
+                // Restaurar botão
+                acceptBtn.innerHTML = originalContent;
+                acceptBtn.disabled = false;
+            }
+        }
+
+        // Atualizar dados
+        function refreshData() {
+            loadPendencias();
+            showNotification('Dados atualizados!', 'info');
+        }
+
+        // Mostrar notificação
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+
